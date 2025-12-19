@@ -1,0 +1,187 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CDT Team Pictionary</title>
+  <style>
+    :root{ --bg:#0f172a; --panel:#111827; --accent:#22c55e; --text:#e5e7eb; --muted:#9ca3af; --warn:#fbbf24; --error:#f87171; }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;background:linear-gradient(160deg,#0b1023,#0f172a 40%,#0b1023);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+    .app{width:min(1100px,100%);background:rgba(17,24,39,.8);border:1px solid #1f2937;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.45);overflow:hidden}
+    header{padding:18px 22px;border-bottom:1px solid #1f2937;display:flex;align-items:center;justify-content:space-between;gap:12px}
+    header h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.2px}
+    .pill{padding:6px 10px;border:1px solid #1f2937;border-radius:999px;color:var(--muted);font-size:13px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:24px}
+    @media (max-width: 900px){ .grid{ grid-template-columns: 1fr; } }
+
+    /* Cards */
+    .card{background:#0d1424;border:1px solid #1f2937;border-radius:14px;padding:18px;position:relative}
+    .card h2{margin:0 0 10px 0;font-size:16px;color:#a7f3d0}
+
+    /* Word generator */
+    .word{font-size:clamp(28px,5.8vw,68px);text-align:center;line-height:1.1;margin:18px 0 6px;font-weight:800}
+    .count{color:var(--muted);text-align:center;margin-bottom:12px}
+    .controls{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:12px}
+    button,select,input,textarea{background:#111827;border:1px solid #1f2937;color:var(--text);padding:10px 14px;border-radius:10px;font-weight:600;cursor:pointer}
+    button:hover{border-color:#374151}
+    button.primary{background:linear-gradient(180deg,#16a34a,#22c55e);border:none;color:#051b0f}
+    button.primary:hover{filter:brightness(1.05)}
+    .row{display:flex;gap:12px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:12px}
+    .timer{font-variant-numeric:tabular-nums;font-size:24px;text-align:center;margin-top:6px;color:#a7f3d0}
+
+    /* Team builder */
+    .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+    .chip{display:inline-flex;align-items:center;gap:8px;background:#0b1322;border:1px solid #1f2937;color:#c7d2fe;padding:6px 10px;border-radius:999px;font-size:13px}
+    .chip button{background:transparent;border:none;color:#fca5a5;padding:0 6px;cursor:pointer}
+    .team-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:14px}
+    .team{background:#0b1322;border:1px solid #1f2937;border-radius:12px;padding:12px}
+    .team h3{margin:0 0 8px 0;font-size:14px;color:#fef08a}
+    .team ul{list-style:none;padding-left:0;margin:0}
+    .team li{padding:6px 8px;border-radius:8px;background:#0f182b;margin-bottom:6px;border:1px dashed #1e293b}
+    .hint{color:var(--muted);font-size:12px}
+
+    .status{margin-top:8px;font-size:12px;color:var(--muted)}
+    .toast{position:absolute;top:12px;right:12px;background:#1f2937;border:1px solid #374151;color:#fff;padding:8px 12px;border-radius:10px;font-size:12px;opacity:0;transform:translateY(-6px);transition:all .25s}
+    .toast.show{opacity:1;transform:translateY(0)}
+    .toast.warn{border-color:#f59e0b;color:#fde68a}
+    .toast.error{border-color:#ef4444;color:#fecaca}
+    .badge{display:inline-block;background:#0b1322;border:1px solid #1f2937;border-radius:999px;padding:4px 8px;font-size:12px;color:#cbd5e1}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>🎨 CDT Team Pictionary</h1>
+      <div class="pill">No actions • No abstract concepts</div>
+    </header>
+
+    <div class="grid">
+      <!-- Left: Word Generator -->
+      <section class="card" aria-label="Word Generator">
+        <h2>Random Word Generator</h2>
+        <div id="word" class="word">Press <em>Next word</em> to begin</div>
+        <div id="count" class="count">0 used • 50 remaining</div>
+
+        <div class="controls">
+          <button id="next" class="primary">▶ Next word</button>
+          <button id="skip">Skip (no use)</button>
+          <button id="reset">Reset</button>
+          <button id="copy">Copy word</button>
+          <button id="shuffle">Shuffle list</button>
+        </div>
+
+        <div class="row">
+          <label>Round length:
+            <select id="seconds">
+              <option value="30">30s</option>
+              <option value="45">45s</option>
+              <option value="60" selected>60s</option>
+              <option value="90">90s</option>
+            </select>
+          </label>
+          <button id="startTimer">Start timer</button>
+          <button id="stopTimer">Stop timer</button>
+          <div id="timer" class="timer">⏱️ 01:00</div>
+        </div>
+        <p class="hint">Tip: <strong>Next word</strong> marks a word as used. <strong>Skip</strong> previews without using it. <strong>Reset</strong> returns all words.</p>
+      </section>
+
+      <!-- Right: Team Builder -->
+      <section class="card" aria-label="Team Builder">
+        <div class="toast" id="toast" role="status" aria-live="assertive"></div>
+        <h2>Team Builder</h2>
+        <div class="row" style="justify-content:flex-start">
+          <textarea id="namesInput" rows="4" style="flex:1" placeholder="Enter names separated by commas or new lines (e.g., Aoife, Liam, Niamh)"></textarea>
+        </div>
+        <div class="controls" style="justify-content:flex-start">
+          <button id="addNames">Add names</button>
+          <button id="clearNames">Clear names</button>
+          <label>Teams:
+            <select id="teamCount">
+              <option value="2" selected>2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+            </select>
+          </label>
+          <button id="assignTeams" class="primary">🎲 Assign to teams</button>
+          <button id="shuffleTeams">Shuffle teams</button>
+          <button id="copyTeams">Copy teams</button>
+        </div>
+        <div class="status"><span class="badge" id="rosterCount">0 players</span> • <span class="badge" id="teamSummary">2 teams</span></div>
+        <div id="chips" class="chips" aria-live="polite"></div>
+        <div id="teams" class="team-grid"></div>
+        <p class="hint">Paste names & click <strong>Add names</strong>, or just click <strong>Assign</strong> and I’ll add them for you automatically.</p>
+      </section>
+    </div>
+  </div>
+
+<script>
+// ==========================
+// Word Generator
+// ==========================
+const ORIGINAL_WORDS=["Cat","Airplane","Pizza","Castle","Fish","Guitar","Volcano","Camera","Rainbow","Tractor","Spaceship","Hamburger","Lighthouse","Bicycle","Tornado","Skyscraper","Chocolate bar","Mountain","Ferris wheel","Coffee mug","Statue of Liberty","Sandwich","Roller coaster","Cheese","Hot air balloon","Soccer ball","Tent","Donut","Watermelon","Train","Spaghetti","Elephant","Backpack","Cupcake","Bridge","Car","Computer","Television","Book","Chair","Boat","Banana","Pyramid","Ice cream","Tree","Clock","House","Ball","Telescope","Submarine"];
+let pool=[],used=[],current=null;
+function shuffle(arr){for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}return arr;}
+function reset(){pool=shuffle([...ORIGINAL_WORDS]);used=[];current=null;renderCount();setWordDisplay("Press <em>Next word</em> to begin");}
+function setWordDisplay(html){document.getElementById('word').innerHTML=html;}
+function renderCount(){document.getElementById('count').textContent=`${used.length} used • ${pool.length} remaining`;}
+function nextWord(markUsed=true){if(pool.length===0){setWordDisplay("✅ All words used! Click <strong>Reset</strong> to start over.");return;}const w=pool.shift();current=w;setWordDisplay(w);if(markUsed)used.push(w);else pool.unshift(w);renderCount();}
+document.getElementById('next').addEventListener('click',()=>nextWord(true));
+document.getElementById('skip').addEventListener('click',()=>nextWord(false));
+document.getElementById('reset').addEventListener('click',reset);
+document.getElementById('shuffle').addEventListener('click',()=>{pool=shuffle(pool);renderCount();});
+document.getElementById('copy').addEventListener('click',async()=>{if(!current)return;try{await navigator.clipboard.writeText(current);}catch(e){}});
+let timerId=null,remainingMs=60000;
+function fmt(ms){const s=Math.max(0,Math.ceil(ms/1000));const m=Math.floor(s/60);const sec=String(s%60).padStart(2,'0');return `${m}:${sec}`;}
+function updateTimer(){document.getElementById('timer').textContent=`⏱️ ${fmt(remainingMs)}`;}
+function startTimer(){const secSel=document.getElementById('seconds');remainingMs=parseInt(secSel.value,10)*1000;updateTimer();if(timerId)clearInterval(timerId);let last=performance.now();timerId=setInterval(()=>{const now=performance.now();const dt=now-last;last=now;remainingMs-=dt;if(remainingMs<=0){remainingMs=0;updateTimer();clearInterval(timerId);timerId=null;document.getElementById('word').animate([{transform:'scale(1)'},{transform:'scale(1.06)'},{transform:'scale(1)'}],{duration:600});}updateTimer();},100);} 
+function stopTimer(){if(timerId){clearInterval(timerId);timerId=null;}}
+document.getElementById('startTimer').addEventListener('click',startTimer);
+document.getElementById('stopTimer').addEventListener('click',stopTimer);
+reset();updateTimer();
+
+// ==========================
+// Team Builder
+// ==========================
+let players = [];
+const toastEl=document.getElementById('toast');
+function toast(msg,type='warn'){toastEl.textContent=msg;toastEl.className='toast show '+(type==='error'?'error':'warn');setTimeout(()=>toastEl.classList.remove('show'),1600);} 
+function normalizeName(n){return n.trim().replace(/\s+/g,' ').replace(/^[-\s]+|[-\s]+$/g,'');}
+function unique(arr){const set=new Set();const out=[];for(const a of arr){const k=a.toLowerCase();if(!set.has(k)){set.add(k);out.push(a);}}return out;}
+function updateStatus(){document.getElementById('rosterCount').textContent = `${players.length} ${players.length===1?'player':'players'}`;
+  const t=document.getElementById('teamCount').value;document.getElementById('teamSummary').textContent=`${t} ${t==='1'?'team':'teams'}`;}
+function renderChips(){const chipsEl=document.getElementById('chips');chipsEl.innerHTML='';players.forEach((name,idx)=>{const span=document.createElement('span');span.className='chip';span.innerHTML=`${name} <button aria-label="Remove ${name}">✕</button>`;span.querySelector('button').addEventListener('click',()=>{players.splice(idx,1);persist();renderChips();renderTeams([]);updateStatus();});chipsEl.appendChild(span);});}
+function parseNamesInput(){const raw=document.getElementById('namesInput').value;const parts=raw.split(/[\n,;]+/).map(normalizeName).filter(Boolean);return unique(parts);}
+function addNames(){const newNames=parseNamesInput();if(!newNames.length){toast('No names detected. Add some names first.', 'warn');return;}
+  const all=unique([...players,...newNames]);players=all.sort((a,b)=>a.localeCompare(b));document.getElementById('namesInput').value='';persist();renderChips();updateStatus();}
+function clearNames(){players=[];document.getElementById('namesInput').value='';persist();renderChips();renderTeams([]);updateStatus();}
+function assign(){if(players.length===0){const pending=parseNamesInput();if(pending.length){players = unique(pending).sort((a,b)=>a.localeCompare(b));document.getElementById('namesInput').value='';persist();renderChips();updateStatus();}
+}
+  if(players.length===0){toast('Add names before assigning teams.', 'error');renderTeams([]);return;}
+  const teamCount=parseInt(document.getElementById('teamCount').value,10)||2;const shuffled=shuffle([...players]);const teams=[...Array(teamCount)].map(()=>[]);let i=0;for(const p of shuffled){teams[i%teamCount].push(p);i++;}renderTeams(teams);}
+function renderTeams(teams){const grid=document.getElementById('teams');grid.innerHTML='';if(!teams || teams.length===0){return;}const labels='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');teams.forEach((members,idx)=>{const card=document.createElement('div');card.className='team';const title=document.createElement('h3');title.textContent=`Team ${labels[idx]}`;card.appendChild(title);const ul=document.createElement('ul');if(members.length===0){const li=document.createElement('li');li.textContent='(no players yet)';li.style.opacity='.7';ul.appendChild(li);}else{members.forEach(m=>{const li=document.createElement('li');li.textContent=m;ul.appendChild(li);});}
+  card.appendChild(ul);grid.appendChild(card);});grid.scrollIntoView({behavior:'smooth',block:'nearest'});} 
+function copyTeams(){const grid=document.getElementById('teams');if(!grid.children.length){toast('No teams to copy yet.','warn');return;}let text='';for(const team of grid.children){const title=team.querySelector('h3').textContent;const names=[...team.querySelectorAll('li')].map(li=>li.textContent);text += `${title}: ${names.join(', ')}\n`;}
+  try{navigator.clipboard.writeText(text);toast('Teams copied to clipboard!','warn');}catch(e){}}
+function shuffleTeams(){const grid=document.getElementById('teams');if(!grid.children.length){assign();return;}
+let currentPlayers=[];for(const team of grid.children){for(const li of team.querySelectorAll('li')){const v=li.textContent;if(v && v!=='(no players yet)') currentPlayers.push(v);} }
+players=unique(currentPlayers);assign();}
+function persist(){try{localStorage.setItem('cdt_pictionary_players', JSON.stringify(players));}catch(e){} }
+function load(){try{const saved=JSON.parse(localStorage.getItem('cdt_pictionary_players')||'[]');if(Array.isArray(saved)&&saved.length){players = unique(saved);}}catch(e){} }
+
+document.getElementById('addNames').addEventListener('click',addNames);
+document.getElementById('clearNames').addEventListener('click',clearNames);
+document.getElementById('assignTeams').addEventListener('click',assign);
+document.getElementById('copyTeams').addEventListener('click',copyTeams);
+document.getElementById('shuffleTeams').addEventListener('click',shuffleTeams);
+document.getElementById('teamCount').addEventListener('change',updateStatus);
+
+// Init
+load();renderChips();updateStatus();
+</script>
+</body>
+</html>
